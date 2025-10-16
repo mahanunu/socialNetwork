@@ -1,18 +1,27 @@
+// back/lib/auth.js
 import { connectToDatabase } from './db.js';
 import User from '../models/User.js';
+import { parse } from 'cookie';
 
 export async function requireAuth(req) {
   await connectToDatabase();
-  
-  // Extraire le token du cookie
-  const cookies = req.headers.cookie?.split(';').map(c => c.trim()) || [];
-  const tokenCookie = cookies.find(c => c.startsWith('token='));
-  const token = tokenCookie ? tokenCookie.split('=')[1] : null;
 
-  if (!token) return { error: 'Non authentifié', status: 401 };
+  // ✅ Lire le cookie de manière fiable
+  const cookies = parse(req.headers.cookie || '');
+  const token = cookies.token;
 
+  if (!token) {
+    return { error: 'Non authentifié (token manquant)', status: 401 };
+  }
+
+  // ✅ Rechercher l'utilisateur avec ce token
   const user = await User.findOne({ 'session.token': token });
-  if (!user || user.session.expiresAt < new Date()) {
+  if (!user) {
+    return { error: 'Session invalide', status: 401 };
+  }
+
+  // ✅ Vérifier si la session est expirée
+  if (user.session.expiresAt && new Date(user.session.expiresAt) < new Date()) {
     return { error: 'Session expirée', status: 401 };
   }
 
