@@ -28,21 +28,17 @@ export default async function handler(req, res) {
     addresses
   } = req.body;
 
-  // Vérification des champs obligatoires
   if (!email || !password || !firstName || !lastName) {
     return res.status(400).json({ error: 'Champs requis manquants' });
   }
 
-  // Vérifie si l'email existe déjà
   const existing = await User.findOne({ email });
   if (existing) {
     return res.status(409).json({ error: 'Email déjà utilisé' });
   }
 
-  // Hash du mot de passe
   const passwordHash = await bcrypt.hash(password, 10);
 
-  // Création du nouvel utilisateur avec tous les champs
   const user = await User.create({
     email,
     passwordHash,
@@ -54,12 +50,10 @@ export default async function handler(req, res) {
     addresses: addresses || [],
   });
 
-  // Génération d’un token de session
   const { token, expiresAt } = User.generateSessionToken();
   user.session = { token, expiresAt };
   await user.save();
 
-  // Création du cookie de session
   const cookie = serialize('token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -70,7 +64,6 @@ export default async function handler(req, res) {
 
   res.setHeader('Set-Cookie', cookie);
 
-  // Réponse complète avec tous les champs du user
   res.status(201).json({
     user: {
       id: user._id,
