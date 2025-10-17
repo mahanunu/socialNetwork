@@ -7,20 +7,27 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [editedContent, setEditedContent] = useState('');
 
-  // Charger le profil
+  // Charger le profil et les posts
   const fetchProfile = async () => {
     try {
       const data = await api.get('/users/me');
       setUser(data.user);
-      setPosts(data.posts || []);
+
+      const allPosts = await api.get('/posts');
+      const userPosts = allPosts.posts.filter(
+        (post) => post.author._id === data.user._id
+      );
+      setPosts(userPosts);
     } catch (err) {
       console.error('Fetch profile error:', err);
       setError('Non authentifié. Veuillez vous connecter.');
     }
   };
 
-  // Publier un post
+  // Publier un nouveau post
   const handlePostSubmit = async (e) => {
     e.preventDefault();
     if (!newPost.trim()) return;
@@ -29,12 +36,51 @@ export default function ProfilePage() {
       setLoading(true);
       await api.post('/posts', { content: newPost });
       setNewPost('');
-      await fetchProfile(); // 🔁 recharger les posts après publication
+      await fetchProfile();
     } catch (err) {
-      console.error('Erreur publication:', err);
-      setError(err.message || 'Erreur lors de la publication');
+      setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Supprimer un post
+  const handleDeletePost = async (id) => {
+    if (!window.confirm('Supprimer ce post ?')) return;
+
+    try {
+      await api.delete(`/posts/${id}`);
+      setPosts((prev) => prev.filter((p) => p._id !== id));
+    } catch (err) {
+      alert('Erreur lors de la suppression du post');
+    }
+  };
+
+  // Passer en mode édition
+  const startEditing = (post) => {
+    setEditingPost(post._id);
+    setEditedContent(post.content);
+  };
+
+  // Annuler modification
+  const cancelEditing = () => {
+    setEditingPost(null);
+    setEditedContent('');
+  };
+
+  // Sauvegarder les modifications
+  const handleEditSubmit = async (id) => {
+    if (!editedContent.trim()) return;
+    try {
+      await api.put(`/posts/${id}`, { content: editedContent });
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === id ? { ...p, content: editedContent } : p
+        )
+      );
+      cancelEditing();
+    } catch (err) {
+      alert('Erreur lors de la modification');
     }
   };
 
@@ -42,13 +88,8 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
-  if (error) {
-    return <div style={{ color: 'red', padding: '20px' }}>{error}</div>;
-  }
-
-  if (!user) {
-    return <div style={{ padding: '20px' }}>Chargement...</div>;
-  }
+  if (error) return <div style={{ color: 'red' }}>{error}</div>;
+  if (!user) return <div>Chargement...</div>;
 
   return (
     <div style={{ padding: '20px', maxWidth: '700px', margin: 'auto' }}>
@@ -57,61 +98,125 @@ export default function ProfilePage() {
       <p><strong>Email :</strong> {user.email}</p>
       <p><strong>Bio :</strong> {user.bio || 'Non renseignée'}</p>
 
-      <hr style={{ margin: '20px 0' }} />
+      <hr />
 
-      {/* 📝 Formulaire de création de post */}
+      {/* Formulaire nouveau post */}
       <h2>Créer un post</h2>
-      <form onSubmit={handlePostSubmit} style={{ marginBottom: '20px' }}>
+      <form onSubmit={handlePostSubmit}>
         <textarea
           value={newPost}
           onChange={(e) => setNewPost(e.target.value)}
           placeholder="Exprime-toi..."
-          style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
-          rows="3"
+          style={{ width: '100%', padding: '10px' }}
         />
         <button
           type="submit"
           disabled={loading}
           style={{
             marginTop: '10px',
-            padding: '10px 20px',
+            backgroundColor: '#007bff',
+            color: 'white',
             border: 'none',
-            borderRadius: '6px',
-            backgroundColor: loading ? '#ccc' : '#007bff',
-            color: '#fff',
-            cursor: loading ? 'not-allowed' : 'pointer',
+            borderRadius: '5px',
+            padding: '10px 20px',
+            cursor: 'pointer',
           }}
         >
           {loading ? 'Publication...' : 'Publier'}
         </button>
       </form>
 
-      <hr style={{ margin: '20px 0' }} />
+      <hr />
 
-      {/* 🧾 Liste des posts */}
-      <h2>Mes Publications</h2>
+      {/* Liste des posts */}
+      <h2>Mes Posts</h2>
       {posts.length === 0 ? (
-        <p>Aucune publication pour le moment.</p>
+        <p>Aucun post pour le moment.</p>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {posts.map((post) => (
-            <li
-              key={post._id}
-              style={{
-                border: '1px solid #ccc',
-                borderRadius: '8px',
-                padding: '10px',
-                marginBottom: '10px',
-                backgroundColor: '#f9f9f9',
-              }}
-            >
-              <p>{post.content}</p>
-              <small>
-                Posté le {new Date(post.createdAt).toLocaleString()}
-              </small>
-            </li>
-          ))}
-        </ul>
+        posts.map((post) => (
+          <div
+            key={post._id}
+            style={{
+              border: '1px solid #ccc',
+              borderRadius: '8px',
+              padding: '10px',
+              marginBottom: '10px',
+              background: '#f9f9f9',
+              position: 'relative',
+            }}
+          >
+            {editingPost === post._id ? (
+              <>
+                <textarea
+                  value={editedContent}
+                  onChange={(e) => setEditedContent(e.target.value)}
+                  style={{ width: '100%', padding: '10px' }}
+                  rows="3"
+                />
+                <div style={{ marginTop: '10px' }}>
+                  <button
+                    onClick={() => handleEditSubmit(post._id)}
+                    style={{
+                      backgroundColor: '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '6px 10px',
+                      marginRight: '5px',
+                    }}
+                  >
+                    ✅ Sauvegarder
+                  </button>
+                  <button
+                    onClick={cancelEditing}
+                    style={{
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '6px 10px',
+                    }}
+                  >
+                    ❌ Annuler
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>{post.content}</p>
+                <small>Posté le {new Date(post.createdAt).toLocaleString()}</small>
+                <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
+                  <button
+                    onClick={() => startEditing(post)}
+                    style={{
+                      backgroundColor: '#ffc107',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '5px 8px',
+                      marginRight: '5px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✏️ Modifier
+                  </button>
+                  <button
+                    onClick={() => handleDeletePost(post._id)}
+                    style={{
+                      backgroundColor: '#dc3545',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '5px 8px',
+                      color: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🗑 Supprimer
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))
       )}
     </div>
   );
