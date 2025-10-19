@@ -19,8 +19,12 @@ const UserStats = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/users/stats', {
-        credentials: 'include'
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${apiUrl}/users/stats`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       if (!response.ok) {
@@ -50,7 +54,9 @@ const UserStats = () => {
 
   // Préparer les données pour les graphiques
   const genderData = stats.genderDistribution.map(item => ({
-    name: item._id || 'Non renseigné',
+    name: item._id === 'male' ? 'Homme' : 
+          item._id === 'female' ? 'Femme' : 
+          item._id || 'Non renseigné',
     value: item.count
   }));
 
@@ -60,7 +66,7 @@ const UserStats = () => {
   }));
 
   const topUsersData = stats.topUsers.map(user => ({
-    name: user.username,
+    name: `${user.firstName} ${user.lastName}`,
     posts: user.postCount
   }));
 
