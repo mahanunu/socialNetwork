@@ -12,6 +12,7 @@
       { "src": "/api/auth/logout", "dest": "/api/auth/logout.js" },
       { "src": "/api/users/me", "dest": "/api/users/me.js" },
       { "src": "/api/users/stats", "dest": "/api/users/stats.js" },
+      { "src": "/api/users/statsSimple", "dest": "/api/users/statsSimple.js" },
       { "src": "/api/users/([^/]+)", "dest": "/api/users/[id].js" },
       { "src": "/api/posts", "dest": "/api/posts/index.js" },
       { "src": "/api/posts/([^/]+)/comments/([^/]+)", "dest": "/api/posts/[id]/comments/[commentId].js" },
