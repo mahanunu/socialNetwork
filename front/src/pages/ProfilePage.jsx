@@ -1,37 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import './ProfilePage.css';
+import { useEffect, useState } from 'react';
+import api from '../services/api';
 
-const ProfilePage = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [newComment, setNewComment] = useState('');
-  const [editingCommentId, setEditingCommentId] = useState(null);
-  const [editContent, setEditContent] = useState('');
+export default function ProfilePage() {
+  const [user, setUser] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [error, setError] = useState('');
+  const [newPost, setNewPost] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [editedContent, setEditedContent] = useState('');
 
-  const fetchProfile = useCallback(async () => {
+  // Charger le profil et les posts
+  const fetchProfile = async () => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${apiUrl}/users/${id}`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      const data = await api.get('/users/me');
+      setUser(data.user);
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          navigate('/login');
-          return;
-        }
-        throw new Error('Erreur lors de la récupération du profil');
-      }
-
-      const data = await response.json();
-      setProfile(data);
+      const allPosts = await api.get('/posts');
+      const userPosts = allPosts.posts.filter(
+        (post) => post.author._id === data.user._id
+      );
+      setPosts(userPosts);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -43,153 +32,196 @@ const ProfilePage = () => {
     fetchProfile();
   }, [fetchProfile]);
 
-  const handleAddComment = async (e) => {
+  // Publier un nouveau post
+  const handlePostSubmit = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${apiUrl}/profile-comments`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          profileOwner: id,
-          content: newComment
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'ajout du commentaire');
-      }
-
-      const comment = await response.json();
-      setProfile(prev => ({
-        ...prev,
-        comments: [comment, ...prev.comments],
-        stats: {
-          ...prev.stats,
-          commentCount: prev.stats.commentCount + 1
-        }
-      }));
-      setNewComment('');
+      setLoading(true);
+      await api.post('/posts', { content: newPost });
+      setNewPost('');
+      await fetchProfile();
     } catch (err) {
-      alert(err.message);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleEditComment = async (commentId) => {
-    if (!editContent.trim()) return;
+  // Supprimer un post
+  const handleDeletePost = async (id) => {
+    if (!window.confirm('Supprimer ce post ?')) return;
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${apiUrl}/profile-comments/${commentId}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: editContent })
-      });
+      await api.delete(`/posts/${id}`);
+      setPosts((prev) => prev.filter((p) => p._id !== id));
+    } catch (err) {
+      alert('Erreur lors de la suppression du post');
+    }
+  };
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de la modification du commentaire');
-      }
+  // Passer en mode édition
+  const startEditing = (post) => {
+    setEditingPost(post._id);
+    setEditedContent(post.content);
+  };
 
-      const updatedComment = await response.json();
-      setProfile(prev => ({
-        ...prev,
-        comments: prev.comments.map(comment =>
-          comment._id === commentId ? updatedComment : comment
+  // Annuler modification
+  const cancelEditing = () => {
+    setEditingPost(null);
+    setEditedContent('');
+  };
+
+  // Sauvegarder les modifications
+  const handleEditSubmit = async (id) => {
+    if (!editedContent.trim()) return;
+    try {
+      await api.put(`/posts/${id}`, { content: editedContent });
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === id ? { ...p, content: editedContent } : p
         )
-      }));
-      setEditingCommentId(null);
-      setEditContent('');
+      );
+      cancelEditing();
     } catch (err) {
-      alert(err.message);
+      alert('Erreur lors de la modification');
     }
   };
 
-  const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce commentaire ?')) {
-      return;
-    }
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${apiUrl}/profile-comments/${commentId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de la suppression du commentaire');
-      }
-
-      setProfile(prev => ({
-        ...prev,
-        comments: prev.comments.filter(comment => comment._id !== commentId),
-        stats: {
-          ...prev.stats,
-          commentCount: prev.stats.commentCount - 1
-        }
-      }));
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  if (loading) return <div className="loading">Chargement...</div>;
-  if (error) return <div className="error">Erreur: {error}</div>;
-  if (!profile) return <div className="not-found">Profil non trouvé</div>;
+  if (error) return <div style={{ color: 'red' }}>{error}</div>;
+  if (!user) return <div>Chargement...</div>;
 
   return (
-    <div className="profile-page">
-      {/* En-tête du profil */}
-      <div className="profile-header">
-        <div className="profile-avatar">
-          {profile.user.firstName?.[0]}{profile.user.lastName?.[0]}
-        </div>
-        <h1>{profile.user.firstName} {profile.user.lastName}</h1>
-        <p className="profile-email">{profile.user.email}</p>
-        {profile.isOwnProfile && <span className="own-profile-badge">Votre profil</span>}
-      </div>
+    <div style={{ padding: '20px', maxWidth: '700px', margin: 'auto' }}>
+      <h1>Mon Profil</h1>
+      <p><strong>Nom :</strong> {user.firstName} {user.lastName}</p>
+      <p><strong>Email :</strong> {user.email}</p>
+      <p><strong>Bio :</strong> {user.bio || 'Non renseignée'}</p>
 
-      {/* Statistiques */}
-      <div className="profile-stats">
-        <div className="stat-item">
-          <span className="stat-value">{profile.stats.postCount}</span>
-          <span className="stat-label">Posts</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-value">{profile.stats.totalLikes}</span>
-          <span className="stat-label">Likes reçus</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-value">{profile.stats.commentCount}</span>
-          <span className="stat-label">Commentaires</span>
-        </div>
-      </div>
+      <hr />
 
-      {/* Posts récents */}
-      {profile.posts.length > 0 && (
-        <div className="posts-section">
-          <h2>Posts récents</h2>
-          <div className="posts-list">
-            {profile.posts.map(post => (
-              <div key={post._id} className="post-item">
-                <h3>{post.title}</h3>
-                <p>{post.content}</p>
-                <div className="post-meta">
-                  <span>❤️ {post.likes?.length || 0} likes</span>
-                  <span>📅 {new Date(post.createdAt).toLocaleDateString()}</span>
+      {/* Formulaire nouveau post */}
+      <h2>Créer un post</h2>
+      <form onSubmit={handlePostSubmit}>
+        <textarea
+          value={newPost}
+          onChange={(e) => setNewPost(e.target.value)}
+          placeholder="Exprime-toi..."
+          style={{ width: '100%', padding: '10px' }}
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            marginTop: '10px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            padding: '10px 20px',
+            cursor: 'pointer',
+          }}
+        >
+          {loading ? 'Publication...' : 'Publier'}
+        </button>
+      </form>
+
+      <hr />
+
+      {/* Liste des posts */}
+      <h2>Mes Posts</h2>
+      {posts.length === 0 ? (
+        <p>Aucun post pour le moment.</p>
+      ) : (
+        posts.map((post) => (
+          <div
+            key={post._id}
+            style={{
+              border: '1px solid #ccc',
+              borderRadius: '8px',
+              padding: '10px',
+              marginBottom: '10px',
+              background: '#f9f9f9',
+              position: 'relative',
+            }}
+          >
+            {editingPost === post._id ? (
+              <>
+                <textarea
+                  value={editedContent}
+                  onChange={(e) => setEditedContent(e.target.value)}
+                  style={{ width: '100%', padding: '10px' }}
+                  rows="3"
+                />
+                <div style={{ marginTop: '10px' }}>
+                  <button
+                    onClick={() => handleEditSubmit(post._id)}
+                    style={{
+                      backgroundColor: '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '6px 10px',
+                      marginRight: '5px',
+                    }}
+                  >
+                    ✅ Sauvegarder
+                  </button>
+                  <button
+                    onClick={cancelEditing}
+                    style={{
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '6px 10px',
+                    }}
+                  >
+                    ❌ Annuler
+                  </button>
                 </div>
-              </div>
-            ))}
+              </>
+            ) : (
+              <>
+                <p>{post.content}</p>
+                <small>Posté le {new Date(post.createdAt).toLocaleString()}</small>
+                <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
+                  <button
+                    onClick={() => startEditing(post)}
+                    style={{
+                      backgroundColor: '#ffc107',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '5px 8px',
+                      marginRight: '5px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✏️ Modifier
+                  </button>
+                  <button
+                    onClick={() => handleDeletePost(post._id)}
+                    style={{
+                      backgroundColor: '#dc3545',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '5px 8px',
+                      color: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🗑 Supprimer
+                  </button>
+                </div>
+              </>
+            )}
           </div>
-        </div>
+        ))
       )}
 
       {/* Section commentaires */}
