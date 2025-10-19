@@ -1,18 +1,18 @@
 import Post from '../../../models/Post.js';
-import { connectDB } from '../../../lib/db.js';
-import { verifyAuth } from '../../../lib/auth.js';
-import { corsMiddleware } from '../../../lib/cors.js';
+import { connectToDatabase } from '../../../lib/db.js';
+import { requireAuth } from '../../../lib/auth.js';
+import { setCorsHeaders } from '../../../lib/cors.js';
 
 async function handler(req, res) {
   const { id } = req.query;
 
   try {
-    const user = await verifyAuth(req);
+    const user = await requireAuth(req);
     if (!user) {
       return res.status(401).json({ error: 'Non autorisé' });
     }
 
-    await connectDB();
+    await connectToDatabase();
 
     if (req.method === 'POST') {
       // Ajouter un commentaire
@@ -63,4 +63,4 @@ async function handler(req, res) {
   }
 }
 
-export default corsMiddleware(handler);
+export default setCorsHeaders(handler);
