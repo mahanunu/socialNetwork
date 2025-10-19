@@ -22,15 +22,20 @@ export default function ProfilePage() {
       );
       setPosts(userPosts);
     } catch (err) {
-      console.error('Fetch profile error:', err);
-      setError('Non authentifié. Veuillez vous connecter.');
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
   // Publier un nouveau post
   const handlePostSubmit = async (e) => {
     e.preventDefault();
-    if (!newPost.trim()) return;
+    if (!newComment.trim()) return;
 
     try {
       setLoading(true);
@@ -218,6 +223,110 @@ export default function ProfilePage() {
           </div>
         ))
       )}
+
+      {/* Section commentaires */}
+      <div className="comments-section">
+        <h2>Commentaires sur le profil</h2>
+        
+        {/* Formulaire d'ajout */}
+        <form onSubmit={handleAddComment} className="add-comment-form">
+          <textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Laisser un commentaire sur ce profil..."
+            rows="3"
+            maxLength={500}
+          />
+          <div className="form-footer">
+            <span className="char-count">{newComment.length}/500</span>
+            <button type="submit" disabled={!newComment.trim()}>
+              Publier
+            </button>
+          </div>
+        </form>
+
+        {/* Liste des commentaires */}
+        <div className="comments-list">
+          {profile.comments.length === 0 ? (
+            <p className="no-comments">Aucun commentaire pour le moment</p>
+          ) : (
+            profile.comments.map(comment => (
+              <div key={comment._id} className="comment">
+                <div className="comment-author">
+                  <strong>{comment.author.firstName} {comment.author.lastName}</strong>
+                  <span className="comment-date">
+                    {new Date(comment.createdAt).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+                
+                {editingCommentId === comment._id ? (
+                  <div className="edit-comment-form">
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows="3"
+                      maxLength={500}
+                    />
+                    <div className="form-footer">
+                      <span className="char-count">{editContent.length}/500</span>
+                      <div className="button-group">
+                        <button 
+                          type="button"
+                          onClick={() => handleEditComment(comment._id)}
+                          disabled={!editContent.trim()}
+                        >
+                          Enregistrer
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setEditingCommentId(null);
+                            setEditContent('');
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="comment-content">
+                      <p>{comment.content}</p>
+                    </div>
+                    {comment.canEdit && (
+                      <div className="comment-actions">
+                        <button 
+                          onClick={() => {
+                            setEditingCommentId(comment._id);
+                            setEditContent(comment.content);
+                          }}
+                        >
+                          ✏️ Modifier
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteComment(comment._id)}
+                          className="delete-btn"
+                        >
+                          🗑️ Supprimer
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default ProfilePage;
