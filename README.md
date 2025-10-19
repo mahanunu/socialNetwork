@@ -85,7 +85,7 @@ cd ../frontend
 npm run dev
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Variables d'environnement
 
@@ -93,7 +93,7 @@ Le projet utilise des variables d'environnement pour la configuration :
 
 - `MONGO_URI` : URI de connexion à MongoDB
 
-## 🏁 Démarrage
+## Démarrage
 
 Une fois l'installation terminée :
 
@@ -101,7 +101,7 @@ Une fois l'installation terminée :
 2. Démarrez le frontend : `npm run dev` dans le dossier `frontend`
 3. Accédez à l'application sur `http://localhost:5173`
 
-## 🌐 API Endpoints
+## API Endpoints
 
 ### Authentification
 - `POST /api/auth/register` - Inscription
