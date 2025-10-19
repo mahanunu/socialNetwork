@@ -1,7 +1,9 @@
 export function setCorsHeaders(res) {
   const allowedOrigins = [
     'http://localhost:5173',
-    'https://snfront.vercel.app'
+    'http://localhost:3000',
+    'https://snfront.vercel.app',
+    'https://socialfront-mu.vercel.app'
   ];
 
   res.setHeader('Access-Control-Allow-Origin', '*');
